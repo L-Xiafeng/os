@@ -1,6 +1,7 @@
 config_interface: textconfig
 display_library: x
-memory: host=32, guest=32
+#memory: host=32, guest=32
+megs : 32
 romimage: file="/home/xiafeng/os/share/bochs/BIOS-bochs-latest", address=0x00000000, options=none
 vgaromimage: file="/home/xiafeng/os/share/bochs/VGABIOS-lgpl-latest"
 boot: disk
