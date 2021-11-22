@@ -52,8 +52,9 @@ SECTION MBR vstart=0x7c00
 
    mov eax ,LOADER_START_SECTOR;起始扇区lba地址
    mov bx,LOADER_BASE_ADDR;写入的地址
-   mov cx,1;读取一个扇区
+   mov cx,4;读取一个扇区
    call rd_disk_m_16
+   
    jmp LOADER_BASE_ADDR
 
 rd_disk_m_16:
@@ -62,57 +63,60 @@ rd_disk_m_16:
                         ;bx 为写入的地址
                         ;cx 为读取的扇区数
 
-   mov dx, 0x1f2        ;0x1f2：设置读取的扇区数的【地址】
-   mov esi,eax          ;备份eax
-   mov di,cx          ;备份eax
-   mov al,cl
-   out dx,al
-   mov eax,esi          ;恢复eax
+      mov dx, 0x1f2        ;0x1f2：设置读取的扇区数的【地址】
+      mov esi,eax          ;备份eax
+      mov di,cx          ;备份eax
+      mov al,cl
+      out dx,al
+      mov eax,esi          ;恢复eax
 
    ;设置7-0位lba
-   mov dx,0x1f3         ;lba7-0位的端口的地址
-   out dx,al            ;写入lba低8位(lba low)
+      mov dx,0x1f3         ;lba7-0位的端口的地址
+      out dx,al            ;写入lba低8位(lba low)
    
    ;设置15-8位lba
-   mov dx,0x1f4         ;lba15-8位的端口的地址
-   mov cl,8             ;每次设置后将eax右移8位，这里设置每次移位的位数
-   shr eax,cl           ;eax右移 8 位
-   out dx,al            ;写入lba mid位
+      mov dx,0x1f4         ;lba15-8位的端口的地址
+      mov cl,8             ;每次设置后将eax右移8位，这里设置每次移位的位数
+      shr eax,cl           ;eax右移 8 位
+      out dx,al            ;写入lba mid位
 
    ;设置24-16位lba
-   mov dx,0x1f5         ;lba15-8位的端口的地址
-   shr eax,cl           ;eax右移 8 位
-   out dx,al            ;写入lba high位
+      mov dx,0x1f5         ;lba15-8位的端口的地址
+      shr eax,cl           ;eax右移 8 位
+      out dx,al            ;写入lba high位
    
    ;设置device寄存器
-   shr eax,cl           ;lba应该是28位，这里eax还有28-25位
-   and al,0x0f          ;al低4位是lab的高 4 位
-   or al,0xe0           ;al高4位，设置模式为 LBA模式，1110
-   mov dx,0x1f6         ;设置device寄存器的地址
-   out dx,al            ;设置device寄存器内容
+      shr eax,cl           ;lba应该是28位，这里eax还有28-25位
+      and al,0x0f          ;al低4位是lab的高 4 位
+      or al,0xe0           ;al高4位，设置模式为 LBA模式，1110
+      mov dx,0x1f6         ;设置device寄存器的地址
+      out dx,al            ;设置device寄存器内容
 
    ;设置command
-   mov dx,0x1f7         ;command寄存器地址，下面的读取阶段是status寄存器
-   mov al,0x20          ;读扇区指令
-   out dx,al            ;把指令写入command寄存器
-.isReady:
-   in al,dx
-   and al,0x88          ;只保留 BSY 位和 DRQ 位
-   cmp al,0x08          ;是否准备好
-   jnz .isReady         ;没准备好
+      mov dx,0x1f7         ;command寄存器地址，下面的读取阶段是status寄存器
+      mov al,0x20          ;读扇区指令
+      out dx,al            ;把指令写入command寄存器
+
+   .isReady:
+      nop
+      in al,dx
+      and al,0x88          ;只保留 BSY 位和 DRQ 位
+      cmp al,0x08          ;是否准备好
+      jnz .isReady         ;没准备好
 ;准备好了，之前di被设置为了cx，即读取扇区数
 ;一个扇区512字节，DATA寄存器16位，2字节，故一个扇区要读取265次
-   mov ax,di            ;扇区数
-   mov dx,256           ;一个扇区256次
-   mul dx               ;两个相乘
-   mov cx,ax            ;结果在DX：AX总中，因为我们知道数字比较小，所以只要AX就行了
-   mov dx,0x1f0         ;DATA寄存器地址
+      mov ax,di            ;扇区数
+      mov dx,256           ;一个扇区256次
+      mul dx               ;两个相乘
+      mov cx,ax            ;结果在DX：AX总中，因为我们知道数字比较小，所以只要AX就行了
+      mov dx,0x1f0         ;DATA寄存器地址
 ;开始读取
-.read_writr_mem:
-   in ax,dx             ;读取2字节
-   mov [bx],ax          ;bx是要写入的地址，ax中的读取到的数据
-   add bx,2             ;地址加2
-   loop .read_writr_mem
-   ret
+   .read_writr_mem:
+      in ax,dx             ;读取2字节
+      mov [bx],ax          ;bx是要写入的地址，ax中的读取到的数据
+      add bx,2             ;地址加2
+      loop .read_writr_mem
+      ret
+
    times 510-($-$$) db 0
    db 0x55,0xaa
