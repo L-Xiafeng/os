@@ -41,10 +41,10 @@
 ;----------------------使用3种中断获取内存容量
 ;---先使用0xE820子程序
     xor ebx, ebx                ;将 ebx 清零
-    mov edx, 0x534d1450         ;设置 EDX 固定签名位
+    mov edx, 0x534d4150         ;设置 EDX 固定签名位
     mov di, ards_buf            ;es已经在 mbr 中赋值过了，只用赋值 di 将得到的ards结构体都存在 ards_buf 中
 .e820_mem_get_loop:
-    mov eax, 0x0000E820             ;每次结束后 eax 值会变成 0x534d4150，要再设置中断号
+    mov eax, 0x0000e820             ;每次结束后 eax 值会变成 0x534d4150，要再设置中断号
     mov ecx, 20                 ;每次写入 20 字节
     int 0x15                    ;调用中断
     jc .e820_failed_try_e801    ;调用出错，试试e801
@@ -97,14 +97,12 @@
     mov ah,0x88
     int 0x15
     jc .error_hlt
+    and eax, 0x0000FFFF         ;清除 eax的 高16 位
     mov cx, 0x400               ;Kb->byte的乘数
     mul cx                      ;;乘出来的结果，高16位在 DX 低16位在 AX
     shl edx, 16                 ;使 高16位 结果到 edx高16位
-    and eax, 0x0000FFFF         ;清除 eax的 高16 位
     or edx, eax                 ;实际上就是将乘积的结果写到了 eax中
     add edx, 0x100000           ;ax 只是15MB，要加上1MB
-    jmp .mem_get_ok
-
 .mem_get_ok:
     mov [total_mem_bytes] , edx ; 将byte单位的最大内存存入 total_mem_bytes 处
 ; ;------------------------------------------------------------
@@ -149,7 +147,7 @@
     or eax, 0x00000001
     mov cr0, eax
 
-    jmp  SELECTOR_CODE:p_mode_start	     ; 刷新流水线，避免分支预测的影响,这种cpu优化策略，最怕jmp跳转，
+    jmp  dword SELECTOR_CODE:p_mode_start	     ; 刷新流水线，避免分支预测的影响,这种cpu优化策略，最怕jmp跳转，
             ; 这将导致之前做的预测失效，从而起到了刷新的作用。
 .error_hlt:		      ;出错则挂起
    hlt
