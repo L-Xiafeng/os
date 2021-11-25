@@ -1,4 +1,4 @@
-    %include "/home/xiafeng/os/include/boot.inc"
+    %include "boot.inc"
     section loader vstart=LOADER_BASE_ADDR 
 
     ;现在用不到栈，不用担心他会修改我们加载进来的loader
@@ -73,20 +73,21 @@
 ; 返回后, ax cx 值一样,以KB为单位,bx dx值一样,以64KB为单位
 ; 在ax和cx寄存器中为低16M,在bx和dx寄存器中为16MB到4G。
 .e820_failed_try_e801:
-    mov eax, 0xE801
+    mov ax, 0xe801
     int 0x15
     jc .e801_failed_try_0x88    ;若当前e801方法失败,尝试0x88方法
 ;1.计算15MB以下容量
     mov cx, 0x400               ;Kb->byte的乘数
     mul cx                      ;乘出来的结果，高16位在 DX,低16位 在 AX
     shl edx, 16                 ;使 高16位 结果到 edx高16位
-    and eax, 0x0000FFFF         ;清除 eax的 高16位
+    and eax, 0x0000FFFF          ;清除 eax的 高16位
     or edx, eax                 ;实际上就是将乘积的结果写到了 eax中
     add edx, 0x100000           ;ax 只是15MB，要加上1MB
     mov esi, edx                ;暂时保存在 esi中
+    
 ;2.计算16MB以上的容量
     xor eax, eax
-    mov ecx, 0x10000             ;64Kb->byte 的乘数
+    mov ecx, 0x10000            ;64Kb->byte 的乘数
     mov ax, bx              
     mul ecx                     ;乘积的 高32位 在edx，低32 位在eax，因为最大只有4G，所以32位的eax就够了
     add esi, eax                ;加上上一步的结果
@@ -136,8 +137,8 @@
 									;3 将cr0的pe位置1
 ;打开A20
     in ax, 0x92
-    or ax, 0000_0010B
-    out 0x92, ax
+    or al, 0000_0010B
+    out 0x92, al
 
 ;加载 GDT
     lgdt [gdt_ptr]
@@ -148,7 +149,7 @@
     mov cr0, eax
 
     jmp  dword SELECTOR_CODE:p_mode_start	     ; 刷新流水线，避免分支预测的影响,这种cpu优化策略，最怕jmp跳转，
-            ; 这将导致之前做的预测失效，从而起到了刷新的作用。
+                                    ; 这将导致之前做的预测失效，从而起到了刷新的作用。
 .error_hlt:		      ;出错则挂起
    hlt
 ;---下面的代码在实模式下运行---
@@ -161,5 +162,82 @@ p_mode_start:
     mov esp, LOADER_STACK_TOP
     mov ax, SELECTOR_VIDEO
     mov gs,ax
-    mov byte [gs:160], 'p'
-    jmp $		       
+
+    ;创建页目录、页表并初始化内存映射（内存位图）
+    call setup_pages
+
+    ;要将描述符表地址及偏移量写入内存gdt_ptr,一会用新地址重新加载
+    sgdt [gdt_ptr]
+
+    ;将gdt描述符中视频段描述符中的段基址+0xc0000000
+    mov ebx, [gdt_ptr + 2]  
+    or dword [ebx + 0x18 + 4], 0xc0000000      ;视频段是第3个段描述符,每个描述符是8字节,故0x18。
+					      ;段描述符的高4字节的最高位是段基址的31~24位
+    ; mov byte [gs:160], 'p'
+    
+    ;将gdt的基址加上0xc0000000使其成为内核所在的高地址
+    add dword [gdt_ptr + 2], 0xc0000000
+    add esp, 0xc0000000         ; 将栈指针同样映射到内核地址
+       ; 把页目录地址赋给cr3
+    mov eax, PAGE_DIR_TABLE_POS
+    mov cr3, eax
+       ; 打开cr0的pg位(第31位)
+    mov eax, cr0
+    or eax, 0x80000000
+    mov cr0, eax
+    ;在开启分页后,用gdt新的地址重新加载
+    lgdt [gdt_ptr]              ; 重新加载
+
+    mov byte [gs:160], 'V'      ;视频段段基址已经被更新,用字符v表示virtual addr
+
+   jmp $     
+
+
+setup_pages:
+;先清零
+    mov ecx, 4096
+    mov esi, 0
+.clear_page_dir:
+    mov byte [PAGE_DIR_TABLE_POS + esi], 0
+    inc esi
+    loop .clear_page_dir
+
+;创建页目录表项PDE
+.create_pde:                    
+; 创建Page Directory Entry
+    mov eax, PAGE_DIR_TABLE_POS
+    add eax, 0x1000             ; 此时eax为第一个页表的位置及属性
+    mov ebx, eax                ; 此处为ebx赋值，是为.create_pte做准备，ebx为基址。
+
+    or eax, PG_RW_W | PG_US_U | PG_P        ; 页目录项的属性RW和P位为1,US为1,表示用户属性,所有特权级别都可以访问.
+    mov [PAGE_DIR_TABLE_POS+0x0], eax       ; 第1个目录项,在页目录表中的第1个目录项写入第一个页表的位置(0x101000)及属性(7)
+    mov [PAGE_DIR_TABLE_POS+0xc00], eax     ; 一个页表项占用4字节,0xc00表示第768个页表占用的目录项,0xc00以上的目录项用于内核空间,
+
+    sub eax,0x1000
+    mov [PAGE_DIR_TABLE_POS+4092], eax     ; 使最后一个目录项指向页目录表自己的地址
+
+
+;创建页表项PTE,我们这里初始化的是第一个（0x101000）处的页表,上面我们已经将ebx赋值为 0x1010000
+    mov ecx, 256                            ; 1M低端内存 / 每页大小4k = 256
+    mov esi, 0
+    mov edx, PG_US_U | PG_RW_W | PG_P       ; 属性为7,US=1,RW=1,P=1
+.create_pte:
+    mov [ebx+esi*4], edx 
+    inc esi
+    add edx, 4096                           ;每个页表项对应4K内容，所以edx每次要增加4K
+    loop .create_pte
+
+;创建内核其它页表的PDE(769-1022)；768及以下属于用户程序；768以上属于系统；最后一个表项指向页目录表自己
+    mov eax,PAGE_DIR_TABLE_POS
+    add eax,0x2000
+    or eax, PG_US_U | PG_RW_W | PG_P
+    mov ebx, PAGE_DIR_TABLE_POS
+    mov ecx, 254
+    mov esi, 769
+.create_kernel_pde:
+    mov [ebx +esi*4], eax
+    inc esi
+    add eax, 0x1000
+    loop .create_kernel_pde
+    ret
+
