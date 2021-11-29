@@ -1,0 +1,1 @@
+nasm -I ./include/ -o  loader.bin loader.s &&  dd if=./loader.bin of=./hd60.img bs=512 seek=2 count=3 conv=notrunc

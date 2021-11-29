@@ -162,7 +162,12 @@ p_mode_start:
     mov esp, LOADER_STACK_TOP
     mov ax, SELECTOR_VIDEO
     mov gs,ax
+; -------------------------   加载kernel  ----------------------
+    mov eax, KERNEL_START_SECTOR                ;kernel.bin所在扇区
+    mov ebx, KERNEL_BIN_BASE_ADDR               ;未解析的kernel将要放的位置
+    mov ecx, 200                                ;读取扇区数
 
+    call rd_disk_m_32
     ;创建页目录、页表并初始化内存映射（内存位图）
     call setup_pages
 
@@ -190,7 +195,64 @@ p_mode_start:
 
     mov byte [gs:160], 'V'      ;视频段段基址已经被更新,用字符v表示virtual addr
 
-   jmp $     
+   jmp SELECTOR_CODE:enter_kernel
+enter_kernel:
+    call kernel_init            ;解析kernel.bin
+    mov esp, 0xc009f000
+    jmp KERNEL_ENTRY_POINT      ;kernel的程序入口
+
+;-----------------   将kernel.bin中的segment拷贝到编译的地址   -----------
+kernel_init:
+    xor eax, eax
+    xor ebx, ebx		;ebx记录程序头表地址
+    xor ecx, ecx		;cx记录程序头表中的program header数量
+    xor edx, edx		;dx 记录program header尺寸,即e_phentsize
+    mov ebx, [KERNEL_BIN_BASE_ADDR + 28]    ; 偏移文件开始部分28字节的地方是e_phoff,表示第1 个program header在文件中的偏移量
+    add ebx, KERNEL_BIN_BASE_ADDR           ;得到程序头表实际位置
+    mov dx, [KERNEL_BIN_BASE_ADDR + 42]     ; 偏移文件42字节处的属性是e_phentsize,表示program header大小
+    mov cx, [KERNEL_BIN_BASE_ADDR + 44]     ; 偏移文件44字节处的属性是e_phnum,表示program header数量
+;遍历每个程序头表项
+.each_segment:
+    cmp byte [ebx + 0], PT_NULL
+    je .PT_NULL
+
+    ;逐字节拷贝 mem_cpy(dst,src,size),栈中三个参数(dst,src,size),调用时从右到左依次入栈
+    ;压入函数memcpy的第三个参数：size
+    push dword [ebx + 16]                   ;ebx+16得到filesize
+        ;通过偏移地址得到实际地址
+    mov eax, [ebx + 4]
+    add eax, KERNEL_BIN_BASE_ADDR
+    ; 压入函数memcpy的第二个参数:源地址
+    push eax,
+    ; 压入函数memcpy的第一个参数:目的地址
+    push dword [ebx +8]
+    call mem_cpy
+    add esp, 12                             ;清理刚才入栈的3个数据
+.PT_NULL:
+    add ebx, eax                            ;增加ebx，处理下一个程序头表项
+    loop .each_segment
+    ret
+
+
+
+;----------  逐字节拷贝 mem_cpy(dst,src,size) ------------
+;输入:栈中三个参数(dst,src,size),调用时从右到左依次入栈
+;输出:无
+;---------------------------------------------------------
+mem_cpy:		      
+   cld
+   push ebp
+   mov ebp, esp
+   push ecx		   ; rep指令用到了ecx，但ecx对于外层段的循环还有用，故先入栈备份
+   mov edi, [ebp + 8]	   ; dst
+   mov esi, [ebp + 12]	   ; src
+   mov ecx, [ebp + 16]	   ; size
+   rep movsb		   ; 逐字节拷贝
+
+   ;恢复环境
+   pop ecx		
+   pop ebp
+   ret
 
 
 setup_pages:
@@ -241,3 +303,67 @@ setup_pages:
     loop .create_kernel_pde
     ret
 
+
+;-------------------------------------------------------------------------------
+			   ;功能:读取硬盘n个扇区
+rd_disk_m_32:	   
+;-------------------------------------------------------------------------------
+							; eax=LBA扇区号
+							; ebx=将数据写入的内存地址
+							; ecx=读入的扇区数
+    mov dx, 0x1f2           ;0x1f2：设置读取的扇区数的端口的【地址】
+    mov esi, eax            ;备份eax
+    mov di, cx              ;备份读取扇区数
+;读写硬盘:
+;第1步：设置要读取的扇区数
+    mov al, cl
+    out dx, al
+    mov eax, esi            ;恢复eax
+
+;第2步：将LBA地址存入0x1f3 ~ 0x1f6
+    ;LBA地址7~0位写入端口0x1f3
+    mov dx, 0x1f3
+    out dx, al
+
+    ;LBA地址15~8位写入端口0x1f4
+    mov cl, 8
+    shr eax,cl
+    mov dx, 0x1f4
+    out dx, al
+
+    shl eax, cl
+    and al, 0x0f 
+    or al, 0xe0
+    mov dx, 0x1f6
+    out dx, al
+
+;第3步：向0x1f7端口写入读命令，0x20 
+    mov dx, 0x1f7
+    mov al, 0x20
+    out dx, al
+
+;;;;;;; 至此,硬盘控制器便从指定的lba地址(eax)处,读出连续的cx个扇区,下面检查硬盘状态,不忙就能把这cx个扇区的数据读出来
+;第4步：检测硬盘状态
+  .not_ready:		   ;测试0x1f7端口(status寄存器)的的BSY位
+      ;同一端口,写时表示写入命令字,读时表示读入硬盘状态
+      nop
+      in al, dx
+      and al, 0x88	   ;第4位为1表示硬盘控制器已准备好数据传输,第7位为1表示硬盘忙
+      cmp al, 0x08
+      jnz .not_ready	   ;若未准备好,继续等。
+    
+;第5步：从0x1f0端口读数据
+    ;计算要读取多少次
+    mov ax, di
+    mov dx, 256
+    mul dx
+    mov cx, ax
+
+    ;开始读取
+    mov dx, 0x1f0
+   .read_writr_mem:
+    in ax, dx
+    mov [ebx], ax   ;这里用ebx是因为bx只能表示0~FFFFh的偏移。达不到我们可能用到的大小
+    add ebx,2
+    loop .read_writr_mem
+    ret

@@ -65,7 +65,7 @@ rd_disk_m_16:
 
       mov dx, 0x1f2        ;0x1f2：设置读取的扇区数的【地址】
       mov esi,eax          ;备份eax
-      mov di,cx          ;备份eax
+      mov di,cx          ;备份cx
       mov al,cl
       out dx,al
       mov eax,esi          ;恢复eax

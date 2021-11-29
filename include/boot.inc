@@ -3,9 +3,10 @@
 LOADER_BASE_ADDR equ 0x900                      ;loader将被加载到这个地址
 LOADER_START_SECTOR equ 0x2                     ;loader所在地址开头
 LOADER_SECTOR_SIZE equ 0x4                      ;loader所占扇区数
-KERNEL_BIN_BASE_ADDR equ 0x70000
-KERNEL_IMAGE_BASE_ADDR  equ   0x1500
-KERNEL_START_SECTOR equ 0x9
+KERNEL_BIN_BASE_ADDR equ 0x70000                ;未解析的kernel文件所在的位置
+KERNEL_IMAGE_BASE_ADDR  equ   0x1500            ;解析后的kernel位置
+KERNEL_START_SECTOR equ 0x9                     ;kernel 在硬盘中的起始扇区
+KERNEL_ENTRY_POINT equ 0xc0001500               ;内核程序入口
 PAGE_DIR_TABLE_POS equ 0x100000                 ;页目录表起始地址
 ;--------------   gdt描述符属性  -------------
 ;高 32 位中的 第23位 G
@@ -63,3 +64,6 @@ PG_RW_W	 equ  10b
 PG_US_S	 equ  000b 
 ;US位：  普通用户位
 PG_US_U	 equ  100b 
+
+;-------------  program type 定义   --------------
+PT_NULL equ 0
