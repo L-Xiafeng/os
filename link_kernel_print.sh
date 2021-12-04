@@ -1,0 +1,1 @@
+ld -Ttext 0xc0001500 -e main -o ./kernel/kernel.bin ./kernel/main.o ./lib/kernel/print.o
