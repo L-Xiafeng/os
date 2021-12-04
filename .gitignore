@@ -1,0 +1,17 @@
+/.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+/elephant/*
+/small_test/*
+/confi-old
+/hd60.img
+/kernel.bin
+/loader.bin
+/loader-exp.bin
+/mbr.bin
+/kernel/kernel.bin
+/kernel/main.o
+/lib/kernel/print.o
+
