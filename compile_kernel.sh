@@ -1,1 +1,1 @@
-gcc -c -o ./kernel/main.o ./kernel/main.c
+gcc -I ./lib/kernel/ -c -o ./kernel/main.o ./kernel/main.c
