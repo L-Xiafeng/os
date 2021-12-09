@@ -1,1 +1,1 @@
-ld  -Ttext 0xc0001500 -e main -o ./build/kernel.bin ./build/main.o ./build/init.o ./build/interrupt.o ./build/print.o ./build/kernel.o
+ld  -Ttext 0xc0001500 -e main -o ./build/kernel.bin ./build/main.o ./build/init.o ./build/interrupt.o ./build/print.o ./build/kernel.o ./build/timer.o

@@ -1,0 +1,1 @@
+gcc -I ./lib/kernel -c -o ./build/timer.o ./device/timer.c
