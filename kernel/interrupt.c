@@ -11,6 +11,9 @@
 
 #define IDT_DESC_CNT 0x21	    // 目前总共支持的中断数
 
+#define EFLAGS_IF   0x00000200       // eflags寄存器中的if位为1
+#define GET_EFLAGS(EFLAG_VAR) asm volatile("pushfl; popl %0" : "=g" (EFLAG_VAR))
+
 /*中断门描述符结构体*/
 struct gate_desc {
    uint16_t    func_offset_low_word;//中断处理程序在目标代码段的偏移低 16 位
@@ -117,9 +120,49 @@ static void exception_init(void){
 void idt_init(){
     put_str("idt_init start\n");
     idt_desc_init();// 初始化中断描述符表
-    exception_init();
+    exception_init();// 异常名初始化并注册通常的中断处理函数
     pic_init();// 初始化8259A
     uint64_t idt_operand = ((sizeof(idt) - 1) | ( (uint64_t) ((uint32_t) idt)) << 16);//要写入IDTR的数据
     asm volatile("lidt %0" : : "m" (idt_operand));
     put_str("idt_init done\n");
+}
+
+/* 获取当前中断状态 */
+enum intr_status intr_get_status(void){
+    uint32_t eflags = 0;
+    GET_EFLAGS(eflags);
+    return (eflags & EFLAGS_IF) ? INTR_ON : INTR_OFF ;
+}
+
+/* 将中断状态设置为status */
+enum intr_status intr_set_status (enum intr_status status){
+    return (status & INTR_ON) ? intr_enable() : intr_disable();
+}
+
+/* 开中断并返回开中断前的状态*/
+enum intr_status intr_enable (void){
+    enum intr_status oldstatus;
+    if (INTR_ON == intr_get_status())
+    {
+        oldstatus = INTR_ON;
+        return oldstatus;
+    }else{
+        oldstatus = INTR_OFF;
+        asm volatile("sti");// 开中断,sti指令将IF位置1
+        return oldstatus;
+    }
+}
+
+/* 关中断,并且返回关中断前的状态 */
+enum intr_status intr_disable (void){
+    enum intr_status oldstatus;
+    if (INTR_ON == intr_get_status())
+    {
+        oldstatus = INTR_ON;
+        asm volatile("cli":::"memory");// 关中断,cli指令将IF位置0
+        return oldstatus;
+    }else{
+        oldstatus = INTR_OFF;
+        return oldstatus;
+    }
 }
