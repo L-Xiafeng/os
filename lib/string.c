@@ -46,7 +46,7 @@ int memcmp(const void* a_, const void* b_, uint32_t size){
 char* strcpy(char* dst_, const char* src_) {
     ASSERT(dst_ !=NULL && src_ != NULL);
     char * r = dst_;
-    while (*dst_++ = *src_++);
+    while ((*dst_++ = *src_++));
     return r;
 }
 
@@ -81,7 +81,8 @@ char* strchr(const char* str, const uint8_t ch){
             return (char*)str;
         }
         str++;
-    }   
+    }
+    return NULL;   
 }
 
 /* 从后往前查找字符串str中首次出现字符ch的地址(不是下标,是地址) */
@@ -105,7 +106,7 @@ char* strcat(char* dst_, const char* src_) {
     char* str = dst_;
     while (*str++);
     --str;//str指向'\0'
-    while (*str++ = *src_++);
+    while ((*str++ = *src_++));
     return dst_;
 }
 
