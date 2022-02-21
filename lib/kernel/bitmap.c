@@ -46,11 +46,11 @@ int bitmap_scan(struct bitmap* btmp, uint32_t cnt){
         return bit_idx_start;
     }
 
-    uint32_t bit_left = (btmp->btmp_bytes_len*8 - bit_idx_start);
+    uint32_t bit_left = (btmp->btmp_bytes_len*8 - bit_idx_start);// 记录还有多少位可以判断
     uint32_t next_bit = bit_idx_start + 1;
-    uint32_t count = 1;
+    uint32_t count = 1;// 用于记录找到的空闲位的个数
     
-    bit_idx_start = -1;
+    bit_idx_start = -1;// 先将其置为-1,若找不到连续的位就直接返回
     /* 如果之前选的地方不能分配连续的足够的空间，
      * 这里会重置count，使用next_bit重新开始搜索 */
     while (bit_left-- > 0)
@@ -61,7 +61,7 @@ int bitmap_scan(struct bitmap* btmp, uint32_t cnt){
         }else{
             count = 0;
         }
-        if (count == cnt)
+        if (count == cnt)// 若找到连续的cnt个空位
         {
             bit_idx_start = next_bit - cnt + 1;
             break;
