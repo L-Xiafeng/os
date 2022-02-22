@@ -4,7 +4,7 @@
 !.vscode/launch.json
 !.vscode/extensions.json
 /build/*
-/elephant/*
+/elephant
 /small_test/*
 /confi-old
 /hd60.img
