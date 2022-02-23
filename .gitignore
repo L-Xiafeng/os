@@ -1,8 +1,5 @@
-/.vscode/*
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
+/.vscode
+/compileshell
 /build
 /elephant
 /small_test/*
@@ -15,4 +12,6 @@
 /kernel/kernel.bin
 /kernel/main.o
 /lib/kernel/print.o
+/share
+/bin
 
