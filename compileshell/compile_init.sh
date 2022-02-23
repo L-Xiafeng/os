@@ -1,1 +1,0 @@
-gcc -I ./lib/kernel -I ./lib -c -fno-builtin -o ./build/init.o ./kernel/init.c

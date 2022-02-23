@@ -1,1 +1,0 @@
-nasm -f elf -o ./build/print.o lib/kernel/print.S 

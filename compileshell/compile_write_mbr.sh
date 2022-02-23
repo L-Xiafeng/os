@@ -1,1 +1,0 @@
-nasm -I ./include/ -o  mbr.bin mbr.s &&  dd if=./mbr.bin of=/home/xiafeng/os/hd60.img bs=512 count=1 conv=notrunc
