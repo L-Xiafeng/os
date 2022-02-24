@@ -83,7 +83,7 @@ put_char:
     inc bx
     mov byte [gs:bx], 0x07  ;这里是高8位
     shr bx,1                ;还原bx
-    jmp .set_cursor         ;设置光标
+    jmp set_cursor         ;设置光标
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -95,7 +95,7 @@ put_char:
     shr bx, 1               ;恢复bx
     inc bx
     cmp bx, 2000
-    jl .set_cursor          ;若光标值小于2000,表示未写到显存的最后,则去设置新的光标值
+    jl set_cursor          ;若光标值小于2000,表示未写到显存的最后,则去设置新的光标值
     ; 若超出屏幕字符数大小(2000)则换行处理
  .is_line_feed:				; 是换行符LF(\n)
  .is_carriage_return:	    ; 是回车符CR(\r)
@@ -112,7 +112,7 @@ put_char:
     add bx, 80
     cmp bx, 2000
  .is_line_feed_end:         ;如果是\n（LF），将光标+80即可
-    jl .set_cursor
+    jl set_cursor
 
 ;屏幕行范围是0~24,滚屏的原理是将屏幕的1~24行搬运到0~23行,再将第24行用空格填充
  .roll_screen:
@@ -132,7 +132,8 @@ put_char:
     mov bx,1920             ;光标在1920处
 
 ;将光标设为bx值
- .set_cursor:
+global set_cursor
+set_cursor:
  ;;;;;;; 1 先设置高8位 ;;;;;;;;
     mov dx, 0x3d4           ;索引寄存器
     mov al, 0x0e            ;光标位置高8位
