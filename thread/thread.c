@@ -87,7 +87,7 @@ static void make_main_thread(void) {
     /* 因为main线程早已运行,咱们在loader.S中进入内核时的mov esp,0xc009f000,
 就是为其预留了pcb,地址为0xc009e000,因此不需要通过get_kernel_page另分配一页*/
     main_thread = running_thread();
-    init_thread(main_thread,"main",62);
+    init_thread(main_thread,"main",31);
     
     /* main函数是当前线程,当前线程正在运行，不在thread_ready_list中,
  * 所以只将其加在thread_all_list中. */
@@ -114,12 +114,42 @@ void schedule() {
     }
 
     ASSERT(!list_empty(&thread_ready_list));
+    thread_tag = NULL;
     thread_tag = list_pop(&thread_ready_list);
     struct task_struct* next = elem2entry(struct task_struct , general_tag , thread_tag);
     next->status = TASK_RUNNING;
     switch_to(cur,next);
 }
 
+/* 当前线程将自己阻塞,标志其状态为stat. */
+void thread_block(enum task_status stat){
+    /* stat取值为TASK_BLOCKED,TASK_WAITING,TASK_HANGING,也就是只有这三种状态才不会被调度*/
+    ASSERT(((stat == TASK_BLOCKED) || (stat == TASK_HANGING) || (stat == TASK_WAITING)));
+    enum intr_status old_status = intr_disable();
+    struct task_struct* cur_thread = running_thread();
+    cur_thread->status = stat;
+    schedule();//将任务调度下来,切换到其他线程
+    //解除阻塞后继续运行
+    intr_set_status(old_status);
+}
+
+/* 将线程pthread解除阻塞 */
+void thread_unblock(struct task_struct* pthread){
+    enum intr_status old_status = intr_disable();
+    ASSERT (((pthread->status == TASK_BLOCKED) || (pthread->status == TASK_WAITING) || (pthread->status == TASK_HANGING)));
+    if (pthread->status!=TASK_READY)
+    {
+        //因为一个线程运行时不在Ready_list中，被阻塞时（运行期间）同样也不会在
+        ASSERT(!elem_find(&thread_ready_list,&pthread->general_tag));
+        if (elem_find(&thread_ready_list,&pthread->general_tag))
+        {
+            PANIC("thread_unblock: blocked thread in ready_list\n");
+        }
+        list_push(&thread_ready_list,&pthread->general_tag);
+        pthread->status = TASK_READY;
+    }
+    intr_set_status(old_status);
+}
 /* 初始化线程环境 */
 void thread_init(void){
     put_str("thread_init start\n");
