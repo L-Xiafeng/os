@@ -2,7 +2,7 @@
 /compileshell
 /build
 /elephant
-/small_test/*
+/small_test
 /confi-old
 /hd60.img
 /kernel.bin
