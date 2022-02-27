@@ -6,6 +6,7 @@
 #include "interrupt.h"
 #include "print.h"
 #include "memory.h"
+#include "process.h"
 
 #define PG_SIZE 4096
 
@@ -20,7 +21,7 @@ extern void switch_to(struct task_struct* cur, struct task_struct* next);
 struct task_struct* running_thread(){
     uint32_t esp;
     asm ("mov %%esp, %0" : "=g" (esp));//esp指向PCB的页中
-    return (struct tast_struct*) (esp & 0xfffff000);
+    return (struct task_struct*) (esp & 0xfffff000);
 }
 
 /* 由kernel_thread去执行function(func_arg) */
@@ -118,6 +119,8 @@ void schedule() {
     thread_tag = list_pop(&thread_ready_list);
     struct task_struct* next = elem2entry(struct task_struct , general_tag , thread_tag);
     next->status = TASK_RUNNING;
+
+    process_activate(next);
     switch_to(cur,next);
 }
 
