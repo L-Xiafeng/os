@@ -47,8 +47,8 @@ static void pic_init(void){
     outb (PIC_S_DATA, 0x28);//ICW2: 起始中断向量号为0x28.IR[8-15] 为 0x28 ~ 0x2F.
     outb (PIC_S_DATA, 0x02);//主片的ID2连接本重片
 
- /* 只打开时钟和键盘中断，其它全部关闭 */
-   outb (PIC_M_DATA, 0xfc);
+/* 只打开时钟中断,其它全部关闭 */
+   outb (PIC_M_DATA, 0xfe);
    outb (PIC_S_DATA, 0xff);
 
     put_str("   pic_init done\n");
