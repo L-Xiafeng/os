@@ -8,6 +8,7 @@
 #include "sync.h"
 #include "interrupt.h"
 #include "thread.h"
+#include "console.h"
 
 #define PG_SIZE 4096                    //页尺寸=4KB
 
@@ -317,8 +318,8 @@ void block_desc_init(struct mem_block_desc* desc_array){
 
     for (desc_idx = 0; desc_idx < DESC_CNT; desc_idx++)
     {
-        desc_array[desc_idx].blocks_per_arena = block_size;
-        desc_array[desc_idx].block_size = (PG_SIZE - sizeof(struct arena)) / block_size;
+        desc_array[desc_idx].blocks_per_arena = (PG_SIZE - sizeof(struct arena)) / block_size;
+        desc_array[desc_idx].block_size = block_size;
         list_init(&desc_array[desc_idx].free_list);
         block_size *=2;
     }
